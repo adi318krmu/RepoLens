@@ -1,0 +1,27 @@
+{
+  "name": "repolens",
+  "version": "1.0.0",
+  "description": "AI GitHub Analyzer is a full-stack application that evaluates a developer’s GitHub repository and provides actionable insights on code quality, structure, and interview readiness. It analyzes repositories using AI to identify strengths, weaknesses, and missing best practices. The system generates structured feedback, includesimprovement suggestions",
+  "homepage": "https://github.com/adi318krmu/RepoLens#readme",
+  "bugs": {
+    "url": "https://github.com/adi318krmu/RepoLens/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adi318krmu/RepoLens.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.4.1",
+    "nodemon": "^3.1.14"
+  }
+}
