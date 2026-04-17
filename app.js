@@ -6,9 +6,10 @@ const PORT=process.env.PORT ??3000
  const connecDB= require("./model/dbConnect")
  connecDB();
 
+ app.use(express.json());
 const userRoute=require('./router/userRoute')
 
-app.use('auth',userRoute)
+app.use('/auth',userRoute)
 app.get('/',(req, res)=>{
     res.send("hello guys")
 })

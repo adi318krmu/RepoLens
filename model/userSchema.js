@@ -3,7 +3,7 @@ const UserSchema= new Schema({
     name :{
         type: String,
         required: true,
-        maxlength=50
+        maxlength:50
     },
     email:{
         type:String,
@@ -26,4 +26,4 @@ const UserSchema= new Schema({
 })
 
 const User=model("user", UserSchema);
-module.exports={User}
+module.exports=User
