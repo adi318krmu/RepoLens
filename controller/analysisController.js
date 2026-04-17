@@ -26,7 +26,10 @@ const { getRepoData } = require("../services/githubService");
 const { analyzeWithAI } = require("../services/geminiService");
 const extractRepoDetails = require("../utils/extractRepo");
 const { calculateScore, getStatus } = require("../services/scoringService");
+const Analysis = require("../model/Analysis");
 
+
+// 🔥 MAIN FUNCTION
 exports.analyzeRepo = async (req, res) => {
   try {
     const { repoUrl } = req.body;
@@ -37,7 +40,6 @@ exports.analyzeRepo = async (req, res) => {
 
     let aiResult;
 
-    // 🔥 Handle AI failure safely
     try {
       aiResult = await analyzeWithAI({
         readme: repoData.readme,
@@ -56,16 +58,49 @@ exports.analyzeRepo = async (req, res) => {
       };
     }
 
-    // 🔥 YOUR LOGIC (MOST IMPORTANT)
     const finalScore = calculateScore(aiResult);
     const status = getStatus(finalScore);
 
-    // ✅ Final response
+    // 🔥 SAVE TO DB
+    const savedAnalysis = await Analysis.create({
+      userId: req.user?.id || null,
+      repoUrl,
+      score: finalScore,
+      status,
+      analysis: aiResult
+    });
+
     res.json({
       success: true,
       score: finalScore,
       status,
-      analysis: aiResult
+      analysis: aiResult,
+      savedAnalysis
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+
+// 🔥 ADD THIS BELOW (new function)
+exports.getHistory = async (req, res) => {
+  try {
+
+    // ⚠️ If no auth, use this instead:
+    const history = await Analysis.find().sort({ createdAt: -1 });
+
+    // If auth exists, use:
+    // const history = await Analysis.find({ userId: req.user?.id }).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      history
     });
 
   } catch (error) {
