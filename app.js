@@ -9,6 +9,9 @@ const PORT=process.env.PORT ??3000
  app.use(express.json());
 const userRoute=require('./router/userRoute')
 
+const analysisRoute=require('./router/analysisRoutes')
+app.use('/api/analysis',analysisRoute)
+
 app.use('/auth',userRoute)
 app.get('/',(req, res)=>{
     res.send("hello guys")
