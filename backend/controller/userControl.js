@@ -1,169 +1,24 @@
-// // const jwt= require("jsonwebtoken")
-// // const User= require("../model/userSchema")
-
-
-// // const signupUser=async(req, res)=>{
-// //     const { name, email, password } = req.body;
-
-// //   try {
-// //     const user = await User.create({ name, email, password });
-
-// //     res.json({
-// //       message: "User created",
-// //       user
-// //     });
-// //   } catch (err) {
-// //     res.status(500).json({ message: err.message });
-// //   }
-// // }
-
-// // const loginUser=async(req,res)=>{
-// //  const { email, password } = req.body;
-
-// //   try {
-// //     const user = await User.findOne({ email, password });
-
-// //     if (!user) {
-// //       return res.status(400).json({ message: "Invalid credentials" });
-// //     }
-
-// //     const token = jwt.sign(
-// //       { id: user._id },
-// //       process.env.JWT_SECRET,
-// //       { expiresIn: "1d" }
-// //     );
-
-// //     res.json({ token });
-// //   } catch (err) {
-// //     res.status(500).json({ message: err.message });
-// //   }
-// // }
-
-// // const getProfile=async(req,   res)=>{
-// //  try {
-// //     const user = await User.findById(req.user.id);
-
-// //     res.json(user);
-// //   } catch (err) {
-// //     res.status(500).json({ message: err.message });
-// //   }
-// // }
-
-// // module.exports={signupUser, loginUser, getProfile}
-// const jwt = require("jsonwebtoken");
-// const bcrypt = require("bcrypt");
-// const User = require("../model/userSchema");
-
-
-// // 🔐 SIGNUP
-// const signupUser = async (req, res) => {
-//   const { name, email, password } = req.body;
-
-//   // 🔥 VALIDATION
-//   if (!name || !email || !password) {
-//     return res.status(400).json({
-//       success: false,
-//       message: "All fields are required"
-//     });
-//   }
-
-//   if (password.length < 6) {
-//     return res.status(400).json({
-//       success: false,
-//       message: "Password must be at least 6 characters"
-//     });
-//   }
-
-//   try {
-//     const user = await User.create({ name, email, password });
-
-//     const { password: _, ...safeUser } = user._doc;
-
-//     res.json({
-//       success: true,
-//       message: "User created",
-//       user: safeUser
-//     });
-
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// };
-
-
-// // 🔐 LOGIN (FIXED)
-// const loginUser = async (req, res) => {
-//   const { email, password } = req.body;
-
-//   try {
-//     // ✅ find by email only
-//     const user = await User.findOne({ email });
-
-//     if (!user) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "User not found"
-//       });
-//     }
-
-//     // ✅ compare hashed password
-//     const isMatch = await bcrypt.compare(password, user.password);
-
-//     if (!isMatch) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Invalid credentials"
-//       });
-//     }
-
-//     // ✅ token generate
-//     const token = jwt.sign(
-//       { id: user._id },
-//       process.env.JWT_SECRET,
-//       { expiresIn: "1d" }
-//     );
-
-//     // 🔥 remove password
-//     const { password: _, ...safeUser } = user._doc;
-
-//     res.json({
-//       success: true,
-//       token,
-//       user: safeUser
-//     });
-
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// };
-
-
-// // 🔐 PROFILE
-// const getProfile = async (req, res) => {
-//   try {
-//     const user = await User.findById(req.user.id).select("-password");
-
-//     res.json({
-//       success: true,
-//       user
-//     });
-
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// };
-
-// module.exports = { signupUser, loginUser, getProfile };
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const User = require("../model/userSchema");
+const authSecret = require("../utils/authSecret");
+const { getDbStatus } = require("../model/dbConnect");
+const {
+  createUser: createLocalUser,
+  findUserByEmail: findLocalUserByEmail,
+  findUserById: findLocalUserById
+} = require("../services/localStore");
 
+function sanitizeUser(user) {
+  const rawUser = user?._doc ?? user;
+  if (!rawUser) return null;
+  const { password, ...safeUser } = rawUser;
+  return safeUser;
+}
 
-// 🔐 SIGNUP
-const signupUser = async (req, res) => {
+async function signupUser(req, res) {
   const { name, email, password } = req.body;
 
-  // 🔥 VALIDATION
   if (!name || !email || !password) {
     return res.status(400).json({
       success: false,
@@ -179,8 +34,10 @@ const signupUser = async (req, res) => {
   }
 
   try {
-    // 🔥 check existing user
-    const existingUser = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase();
+    const existingUser = getDbStatus()
+      ? await User.findOne({ email: normalizedEmail })
+      : await findLocalUserByEmail(normalizedEmail);
 
     if (existingUser) {
       return res.status(400).json({
@@ -189,32 +46,31 @@ const signupUser = async (req, res) => {
       });
     }
 
-    const user = await User.create({ name, email, password });
+    const user = getDbStatus()
+      ? await User.create({ name, email: normalizedEmail, password })
+      : await createLocalUser({
+          name,
+          email: normalizedEmail,
+          password: await bcrypt.hash(password, 10)
+        });
 
-    // 🔥 remove password
-    const { password: _, ...safeUser } = user._doc;
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "User created",
-      user: safeUser
+      user: sanitizeUser(user)
     });
-
-  } catch (err) {
-    console.error("SIGNUP ERROR:", err);
-    res.status(500).json({
+  } catch (error) {
+    console.error("SIGNUP ERROR:", error);
+    return res.status(500).json({
       success: false,
-      message: "Server error"
+      message: "Unable to create account"
     });
   }
-};
+}
 
-
-// 🔐 LOGIN (CORRECTED)
-const loginUser = async (req, res) => {
+async function loginUser(req, res) {
   const { email, password } = req.body;
 
-  // 🔥 VALIDATION
   if (!email || !password) {
     return res.status(400).json({
       success: false,
@@ -223,8 +79,10 @@ const loginUser = async (req, res) => {
   }
 
   try {
-    // 🔥 find user by email
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase();
+    const user = getDbStatus()
+      ? await User.findOne({ email: normalizedEmail })
+      : await findLocalUserByEmail(normalizedEmail);
 
     if (!user) {
       return res.status(400).json({
@@ -233,8 +91,8 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // 🔥 compare hashed password
-    const isMatch = await bcrypt.compare(password, user.password);
+    const passwordHash = user.password ?? user?._doc?.password;
+    const isMatch = await bcrypt.compare(password, passwordHash);
 
     if (!isMatch) {
       return res.status(400).json({
@@ -243,37 +101,28 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // 🔥 generate token
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    const token = jwt.sign({ id: user._id }, authSecret, { expiresIn: "1d" });
 
-    // 🔥 remove password
-    const { password: _, ...safeUser } = user._doc;
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Login successful",
       token,
-      user: safeUser
+      user: sanitizeUser(user)
     });
-
-  } catch (err) {
-    console.error("LOGIN ERROR:", err);
-    res.status(500).json({
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+    return res.status(500).json({
       success: false,
-      message: "Server error"
+      message: "Unable to log in"
     });
   }
-};
+}
 
-
-// 🔐 PROFILE
-const getProfile = async (req, res) => {
+async function getProfile(req, res) {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    const user = getDbStatus()
+      ? await User.findById(req.user.id).select("-password")
+      : await findLocalUserById(req.user.id);
 
     if (!user) {
       return res.status(404).json({
@@ -282,19 +131,17 @@ const getProfile = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      user
+      user: sanitizeUser(user)
     });
-
-  } catch (err) {
-    console.error("PROFILE ERROR:", err);
-    res.status(500).json({
+  } catch (error) {
+    console.error("PROFILE ERROR:", error);
+    return res.status(500).json({
       success: false,
-      message: "Server error"
+      message: "Unable to load profile"
     });
   }
-};
-
+}
 
 module.exports = { signupUser, loginUser, getProfile };

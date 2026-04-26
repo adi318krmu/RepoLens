@@ -1,42 +1,44 @@
-// const { getRepoData } = require("../services/githubService");
-// const extractRepoDetails = require("../utils/extractRepo");
-
-// exports.analyzeRepo = async (req, res) => {
-//   try {
-//     const { repoUrl } = req.body;
-
-//     const { owner, repo } = extractRepoDetails(repoUrl);
-
-//     const data = await getRepoData(owner, repo);
-
-//     res.json({
-//       success: true,
-//       data
-//     });
-
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       message: error.message
-//     });
-//   }
-// };
-
 const { getRepoData } = require("../services/githubService");
 const { analyzeWithAI } = require("../services/geminiService");
 const extractRepoDetails = require("../utils/extractRepo");
 const { calculateScore, getStatus } = require("../services/scoringService");
 const Analysis = require("../model/Analysis");
+const { getDbStatus } = require("../model/dbConnect");
+const {
+  createAnalysis: createLocalAnalysis,
+  getHistory: getLocalHistory
+} = require("../services/localStore");
 
+function fallbackAnalysis(message = "AI unavailable") {
+  return {
+    codeQuality: 5,
+    readability: 5,
+    bestPractices: 5,
+    documentation: 5,
+    issues: [message],
+    suggestions: ["Try again later"]
+  };
+}
 
-// 🔥 MAIN FUNCTION
-exports.analyzeRepo = async (req, res) => {
+async function analyzeRepo(req, res) {
   try {
     const { repoUrl } = req.body;
 
-    const { owner, repo } = extractRepoDetails(repoUrl);
+    if (!repoUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Repository URL is required"
+      });
+    }
 
-    const repoData = await getRepoData(owner, repo);
+    let repoData = { readme: "", files: [] };
+
+    try {
+      const { owner, repo } = extractRepoDetails(repoUrl);
+      repoData = await getRepoData(owner, repo);
+    } catch (_error) {
+      repoData = { readme: "", files: [] };
+    }
 
     let aiResult;
 
@@ -45,68 +47,62 @@ exports.analyzeRepo = async (req, res) => {
         readme: repoData.readme,
         files: repoData.files
       });
-    } catch (err) {
-      console.log("AI failed, using fallback");
-
-      aiResult = {
-        codeQuality: 5,
-        readability: 5,
-        bestPractices: 5,
-        documentation: 5,
-        issues: ["AI unavailable"],
-        suggestions: ["Try again later"]
-      };
+    } catch (_error) {
+      aiResult = fallbackAnalysis("AI unavailable");
     }
 
     const finalScore = calculateScore(aiResult);
     const status = getStatus(finalScore);
 
-    // 🔥 SAVE TO DB
-    const savedAnalysis = await Analysis.create({
-      userId: req.user?.id || null,
-      repoUrl,
-      score: finalScore,
-      status,
-      analysis: aiResult
-    });
+    const savedAnalysis = getDbStatus()
+      ? await Analysis.create({
+          userId: req.user?.id || null,
+          repoUrl,
+          score: finalScore,
+          status,
+          analysis: aiResult
+        })
+      : await createLocalAnalysis({
+          userId: req.user?.id || null,
+          repoUrl,
+          score: finalScore,
+          status,
+          analysis: aiResult
+        });
 
-    res.json({
+    return res.json({
       success: true,
       score: finalScore,
       status,
       analysis: aiResult,
       savedAnalysis
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error("ANALYSIS ERROR:", error);
+    return res.status(500).json({
       success: false,
-      message: error.message
+      message: "Unable to analyze repository"
     });
   }
-};
+}
 
-
-
-// 🔥 ADD THIS BELOW (new function)
-exports.getHistory = async (req, res) => {
+async function getHistory(req, res) {
   try {
+    const history = getDbStatus()
+      ? await Analysis.find(req.user?.id ? { userId: req.user.id } : {}).sort({ createdAt: -1 })
+      : await getLocalHistory(req.user?.id);
 
-    // ⚠️ If no auth, use this instead:
-    const history = await Analysis.find().sort({ createdAt: -1 });
-
-    // If auth exists, use:
-    // const history = await Analysis.find({ userId: req.user?.id }).sort({ createdAt: -1 });
-
-    res.json({
+    return res.json({
       success: true,
       history
     });
-
   } catch (error) {
-    res.status(500).json({
+    console.error("HISTORY ERROR:", error);
+    return res.status(500).json({
       success: false,
-      message: error.message
+      message: "Unable to load history"
     });
   }
-};
+}
+
+module.exports = { analyzeRepo, getHistory };

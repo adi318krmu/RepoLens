@@ -1,11 +1,16 @@
 const express= require("express")
 const app=express()
 const dotenv= require("dotenv")
+const cors = require("cors")
 dotenv.config()
 const PORT=process.env.PORT ??3000
  const connecDB= require("./model/dbConnect")
  connecDB();
 
+app.use(cors({
+  origin: true,
+  credentials: true
+}))
  app.use(express.json());
  const rateLimit = require("express-rate-limit");
 

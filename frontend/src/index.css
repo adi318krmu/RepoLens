@@ -1,0 +1,101 @@
+:root {
+  --bg: #07111f;
+  --bg-secondary: #0b1728;
+  --panel: rgba(7, 12, 20, 0.72);
+  --surface: rgba(255, 255, 255, 0.035);
+  --border: rgba(148, 163, 184, 0.18);
+  --text-strong: #f8fafc;
+  --text-soft: #cbd5e1;
+  --muted: #94a3b8;
+  --shadow: 0 24px 50px rgba(2, 6, 23, 0.42);
+  --sans: 'Segoe UI', 'Trebuchet MS', Verdana, sans-serif;
+  --heading: Georgia, 'Times New Roman', serif;
+  --mono: 'Cascadia Code', Consolas, monospace;
+  color-scheme: dark;
+  font: 17px/1.6 var(--sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  color: var(--text-soft);
+  background:
+    radial-gradient(circle at top left, rgba(45, 212, 191, 0.1), transparent 24%),
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 22%),
+    linear-gradient(180deg, var(--bg), var(--bg-secondary));
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, black 45%, transparent 85%);
+}
+
+#root {
+  width: min(1240px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+h1,
+h2,
+h3,
+strong {
+  color: var(--text-strong);
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--heading);
+  font-size: clamp(2.9rem, 5vw, 4.8rem);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+h2 {
+  margin: 0.2rem 0 0;
+  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+}
+
+h3 {
+  margin: 0.25rem 0 0;
+  font-size: 1.25rem;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+@media (max-width: 720px) {
+  #root {
+    width: min(100% - 20px, 1240px);
+    padding-top: 14px;
+  }
+}
