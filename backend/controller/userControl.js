@@ -53,10 +53,12 @@ async function signupUser(req, res) {
           email: normalizedEmail,
           password: await bcrypt.hash(password, 10)
         });
+    const token = jwt.sign({ id: user._id }, authSecret, { expiresIn: "1d" });
 
     return res.status(201).json({
       success: true,
       message: "User created",
+      token,
       user: sanitizeUser(user)
     });
   } catch (error) {
