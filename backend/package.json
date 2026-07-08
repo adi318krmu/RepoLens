@@ -15,7 +15,7 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "start":"node app.js",
+    "start": "node app.js",
     "dev": "nodemon app.js"
   },
   "dependencies": {
@@ -28,7 +28,9 @@
     "express-rate-limit": "^8.3.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.4.1",
+    "multer": "^2.2.0",
     "nodemon": "^3.1.14",
-    "openai": "^6.34.0"
+    "openai": "^6.34.0",
+    "pdf2json": "^4.0.3"
   }
 }

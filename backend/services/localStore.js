@@ -89,10 +89,49 @@ async function getHistory(userId) {
   return [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
+async function createResumeAnalysis({ userId = null, targetRole, targetCompany = "", jobDescription = "", atsScore, eligibility, verdict, analysis }) {
+  const data = await readData();
+  if (!data.resumeAnalyses) {
+    data.resumeAnalyses = [];
+  }
+  const now = new Date().toISOString();
+  const entry = {
+    _id: makeId("resume_analysis"),
+    userId,
+    targetRole,
+    targetCompany,
+    jobDescription,
+    atsScore,
+    eligibility,
+    verdict,
+    analysis,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  data.resumeAnalyses.push(entry);
+  await writeData(data);
+  return entry;
+}
+
+async function getResumeHistory(userId) {
+  const data = await readData();
+  if (!data.resumeAnalyses) {
+    return [];
+  }
+  const filtered = userId
+    ? data.resumeAnalyses.filter((entry) => entry.userId === userId)
+    : data.resumeAnalyses;
+
+  return [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
 module.exports = {
   createAnalysis,
   createUser,
   findUserByEmail,
   findUserById,
-  getHistory
+  getHistory,
+  createResumeAnalysis,
+  getResumeHistory
 };

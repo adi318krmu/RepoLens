@@ -1,4 +1,4 @@
-const axios= require("axios")
+const axios = require("axios");
 const BASE_URL = "https://api.github.com/repos";
 
 async function getRepoData(owner, repo) {
@@ -30,4 +30,27 @@ async function getRepoData(owner, repo) {
   }
 }
 
-module.exports = { getRepoData };
+async function getUserGithubData(username) {
+  try {
+    const headers = {
+      Accept: "application/vnd.github.v3+json",
+      "User-Agent": "RepoLens-Grader-App"
+    };
+    if (process.env.GITHUB_TOKEN) {
+      headers.Authorization = `token ${process.env.GITHUB_TOKEN}`;
+    }
+
+    const profileRes = await axios.get(`https://api.github.com/users/${username}`, { headers });
+    const reposRes = await axios.get(`https://api.github.com/users/${username}/repos?per_page=100`, { headers });
+
+    return {
+      profile: profileRes.data,
+      repos: reposRes.data
+    };
+  } catch (error) {
+    console.error("Error fetching GitHub user data:", error.message);
+    throw error;
+  }
+}
+
+module.exports = { getRepoData, getUserGithubData };

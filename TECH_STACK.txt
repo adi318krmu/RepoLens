@@ -1,0 +1,95 @@
+========================================================================
+                      REPOLENS - TECHNOLOGY STACK DETAILS
+========================================================================
+
+This document explains the architecture and technology stack of RepoLens 
+and details the design decisions behind each selection.
+
+------------------------------------------------------------------------
+1. FRONTEND: React, Vite, Tailwind CSS, Lucide React
+------------------------------------------------------------------------
+- Why React:
+  * React's component-driven architecture is ideal for building dynamic, 
+    interactive dashboards (like RepoLens' score charts and analyzer widgets).
+  * React hooks (useState, useEffect, useContext) allow for simple and 
+    clean state management, such as user sessions or scan outcomes.
+
+- Why Vite:
+  * Fast Build Times: Vite uses Native ESM-based hot module replacement 
+    (HMR), which provides near-instant reload times compared to webpack.
+  * Optimizations: Vite splits code automatically and sets up modern, 
+    performant production builds with rollup out of the box.
+
+- Why Tailwind CSS:
+  * Speed: Allows rapid UI prototyping using utility classes without writing 
+    custom verbose CSS files.
+  * Responsiveness: Easy layout customization for desktop sidebars and 
+    collapsible mobile layouts.
+  * Modern Aesthetics: Tailwind's color schemes match dark modes and 
+    glassmorphism layouts cleanly.
+
+------------------------------------------------------------------------
+2. BACKEND: Node.js, Express.js, Multer
+------------------------------------------------------------------------
+- Why Node.js & Express:
+  * High Concurrency: Node.js runs on the V8 engine and handles asynchronous 
+    non-blocking I/O operations, making it extremely efficient for network-heavy 
+    tasks like querying the GitHub API and sending external AI requests.
+  * Fast setup: Express.js provides lightweight and modular routing controls for 
+    handling API requests, route protection, and CORS management.
+
+- Why Multer:
+  * In-Memory File Buffering: Multer reads incoming multipart file uploads (like PDF 
+    resumes) in memory buffers rather than disk storage. This minimizes read/write 
+    latency and satisfies stateless hosting environments (like Render or Heroku) 
+    which do not allow persistent storage.
+
+------------------------------------------------------------------------
+3. DATABASE: MongoDB, Mongoose
+------------------------------------------------------------------------
+- Why MongoDB & Mongoose:
+  * Flexible Document Schema: AI responses are irregular and nested. MongoDB's 
+    BSON document structure is natural for storing raw JSON objects without 
+    writing rigid SQL tables.
+  * Local Storage Fallback: The backend uses a local JSON file-based database 
+    system if MongoDB is offline or disconnected, keeping development clean and 
+    offline-friendly.
+  * Mongoose Hooks: Mongoose pre-save hooks hash passwords automatically when a 
+    user profile is created or updated, consolidating safety measures.
+
+------------------------------------------------------------------------
+4. SECURITY & AUTH: JWT, bcrypt, Express Rate Limit
+------------------------------------------------------------------------
+- Why JWT (JSON Web Tokens):
+  * Stateless Authentication: The server does not need to store active session IDs in 
+    memory or DB. All authorization payload details (e.g. user ID) are stored securely 
+    in the encrypted token stored by the frontend.
+  * Interceptors: The token is automatically attached to outgoing Axios request headers, 
+    making route protection robust.
+
+- Why bcrypt:
+  * Secure Password Hashing: Uses salt rounds to defend passwords against rainbow tables 
+    and brute-force searches.
+
+- Why Express Rate Limit:
+  * API Protection: Defends endpoints against denial of service (DoS) and excessive spam.
+
+------------------------------------------------------------------------
+5. CLOUD AI INTEGRATIONS: Hugging Face Inference API, Google Gemini
+------------------------------------------------------------------------
+- Why Hugging Face Serverless Inference:
+  * Hugging Face APIs are modular, giving developers access to thousands of open-source 
+    state-of-the-art LLMs (like Qwen-2.5 or Llama-3) with simple authorization tokens.
+  * Perfect for specialized natural language processing task prompts (like ATS calculations).
+
+- Why Multi-Layer Fallback Architecture:
+  * To guarantee maximum system availability, the server runs a three-tier API pipeline:
+    1. Hugging Face Inference API (Primary)
+    2. Google Gemini Generative AI API (Secondary Fallback)
+    3. Custom Local Recruiter Model (Local Offline/Sandbox Fallback)
+  * This structure guarantees that the user always receives structured feedback, scoring, 
+    and recommendations, even during networking outages or API limits.
+
+- Why PDF2JSON:
+  * Extracts raw text from uploaded resumes in memory without requiring external OCR 
+    dependencies, and is fully compatible with Node 20+ event loop architectures.

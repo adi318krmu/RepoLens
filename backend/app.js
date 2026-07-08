@@ -4,15 +4,15 @@ const dotenv= require("dotenv")
 const cors = require("cors")
 dotenv.config()
 const PORT=process.env.PORT ??3000
- const connecDB= require("./model/dbConnect")
- connecDB();
+const connecDB= require("./model/dbConnect")
+connecDB();
 
 app.use(cors({
   origin: true,
   credentials: true
 }))
- app.use(express.json());
- const rateLimit = require("express-rate-limit");
+app.use(express.json());
+const rateLimit = require("express-rate-limit");
 
 // 🔥 LIMIT: 100 requests per 15 minutes
 const limiter = rateLimit({
@@ -26,15 +26,19 @@ const limiter = rateLimit({
 
 // 🔥 APPLY TO ALL ROUTES
 app.use(limiter);
-const userRoute=require('./router/userRoute')
 
-const analysisRoute=require('./router/analysisRoutes')
-app.use('/api/analysis',analysisRoute)
+const userRoute = require('./router/userRoute')
+const analysisRoute = require('./router/analysisRoutes')
+const resumeRoute = require('./router/resumeRoutes')
 
-app.use('/auth',userRoute)
-app.get('/',(req, res)=>{
+app.use('/api/analysis', analysisRoute)
+app.use('/api/resume', resumeRoute)
+app.use('/auth', userRoute)
+
+app.get('/', (req, res) => {
     res.send("hello guys")
 })
+
 app.listen(PORT, () => {
     console.log("------- Server Started --------");
 });

@@ -1,0 +1,8 @@
+--- Hugging Face API Check ---
+Timestamp: 2026-07-08T01:47:57.320Z
+HF_TOKEN Present: true
+HF_TOKEN Preview: hf_WYbMr...
+Model: Qwen/Qwen2.5-7B-Instruct
+
+[FAILURE]
+Error Message: getaddrinfo ENOTFOUND api-inference.huggingface.co

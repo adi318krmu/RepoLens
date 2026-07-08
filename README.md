@@ -1,268 +1,126 @@
-# 🚀 AI GitHub Analyzer
+# 🚀 RepoLens - AI-Powered GitHub Repository & Resume ATS Analyzer
 
-An intelligent backend system that analyzes GitHub repositories and provides **structured feedback, scoring, and improvement suggestions** using AI.
+RepoLens is a full-stack dashboard application that evaluates a developer's GitHub repositories and resume profiles using AI to identify code quality metrics, best practices gaps, interview readiness, and ATS keyword optimization.
 
----
-
-## 🧠 Problem Statement
-
-Developers upload projects on GitHub but often lack **clear, actionable feedback** on:
-
-* Code quality
-* Project structure
-* Best practices
-* Interview readiness
-
-Existing tools focus on metrics like stars or commits, but **do not evaluate code quality in depth**.
+RepoLens combines AI evaluation models with a custom weighted scoring engine, providing developers with actionable suggestions to make their portfolios production-ready and optimize their resumes for candidate selection.
 
 ---
 
-## 💡 Solution
+## ⚙️ Core Technology Stack
 
-AI GitHub Analyzer is a backend application that:
+RepoLens is designed with a modern decoupled stack:
 
-* Fetches repository data using GitHub API
-* Uses AI to analyze README and project structure
-* Applies a custom scoring system
-* Stores analysis history for users
-
-👉 It provides **quantitative + qualitative evaluation** of projects.
-
----
-
-## ⚙️ Tech Stack
+### Frontend
+- **Framework**: React.js (via Vite)
+- **Styling**: Tailwind CSS & Lucide Icons
+- **Animation**: Framer Motion
+- **Chart Visualizations**: Custom SVG circular gauges and responsive CSS bar/trend trackers
 
 ### Backend
+- **Server**: Node.js & Express.js
+- **File Upload**: Multer (In-memory buffering)
+- **Resume Parsing**: pdf2json (Buffer extraction)
 
-* Node.js
-* Express.js
+### Database & Authentication
+- **Database**: MongoDB & Mongoose (with JSON file-based database fallback when offline)
+- **Authentication**: JSON Web Tokens (JWT) & bcrypt password hashing
 
-### Database
-
-* MongoDB
-* Mongoose
-
-### Authentication
-
-* JWT (JSON Web Tokens)
-* bcrypt (password hashing)
-
-### APIs
-
-* GitHub REST API
-* AI Integration (Gemini / OpenAI - pluggable)
+### Artificial Intelligence Integration
+- **Hugging Face Serverless Inference**: Primary engine for Resume ATS analysis (utilizing state-of-the-art chat models like `Qwen/Qwen2.5-72B-Instruct`)
+- **Google Gemini Pro**: Primary engine for Repository code review and secondary fallback for resume analysis
+- **Offline Fallback Engine**: Local NLP parser logic to output structured assessments if external AI networks are unreachable
 
 ---
 
-## 🚀 Features
+## 💡 Key Features
 
-### 🔐 Authentication
+### 🔐 1. Secure Authentication & Protected Sessions
+- Complete signup, login, profile loading, and logout session handling.
+- Secure, stateless JWT auth headers. Tokens are cached in local storage and automatically attached via Axios interceptors.
+- bcrypt password encryption at the Mongoose database schema level.
 
-* User Signup & Login
-* Secure password hashing with bcrypt
-* JWT-based authentication
+### 📊 2. AI GitHub Repository Analyzer
+- **Automatic Metadata Scraping**: Queries the GitHub API to fetch README files, file structures, and repo details.
+- **Custom Scoring Engine**: Applies a weighted grading scheme across four core vectors:
+  - Code Quality (40%)
+  - Readability (20%)
+  - Best Practices (20%)
+  - Documentation (20%)
+- **Actionable AI Feedback**: Pinpoints code issues, identifies strengths, and outputs practical recommendations.
 
----
+### 📄 3. Intelligent Resume ATS Analyzer
+- **Dual Submission Methods**: Upload raw PDF/text resume files or paste resume text directly.
+- **ATS Compatibility Score**: Computes compatibility scores (0-100) aligned with target roles, companies, and requirements.
+- **Keyword Gap Analysis**: Highlights matched keywords and outputs lists of high-impact missing ATS keywords.
+- **Detailed Recruiter Insights**: Highlights strengths, weaknesses, overall selection verdicts, and concrete improvement steps.
 
-### 📊 Repository Analysis
-
-* Accept GitHub repo URL
-* Fetch:
-
-  * README
-  * File structure
-  * Metadata
-
----
-
-### 🤖 AI-Powered Insights
-
-* Code quality evaluation
-* Readability analysis
-* Best practices detection
-
----
-
-### 🧠 Scoring Engine (Core Feature)
-
-Custom weighted scoring system:
-
-* Code Quality → 40%
-* Readability → 20%
-* Best Practices → 20%
-* Documentation → 20%
-
-👉 Generates final score + status:
-
-* Excellent
-* Good
-* Average
-* Poor
+### 📈 4. Dashboard & Scanning Histories
+- Overall scan trend charts, average score track indicators, and repo performance lists.
+- Separate record history archives for both GitHub repos and Resumes, enabling quick review loading.
 
 ---
 
-### 📈 History Tracking
+## 🚦 Core API Endpoints
 
-* Stores past analyses
-* User-specific history
-* Sorted by latest
+### Auth Endpoints (`/auth`)
+- `POST /auth/signup` - Register a new account
+- `POST /auth/login` - Verify password and retrieve JWT session token
+- `GET /auth/profile` - Load authenticated user details (Protected)
 
----
+### Repo Analysis Endpoints (`/api/analysis`)
+- `POST /api/analysis` - Analyze a new public GitHub repository (Protected)
+- `GET /api/analysis/history` - Retrieve repository scan history (Protected)
+- `GET /api/analysis/:id` - Fetch details of a specific past repo scan (Protected)
 
-### 🛡️ Security
-
-* Password hashing (bcrypt)
-* Protected routes using JWT
-* Input validation
-* Rate limiting
-
----
-
-## 🧩 System Flow
-
-1. User logs in
-2. Sends GitHub repository URL
-3. Backend fetches repo data (GitHub API)
-4. AI analyzes content
-5. Scoring engine calculates final score
-6. Result stored in MongoDB
-7. Response sent to user
+### Resume Analyzer Endpoints (`/api/resume`)
+- `POST /api/resume/analyze` - Process file uploads or raw text, run ATS check, and save reports (Protected)
+- `GET /api/resume/history` - Retrieve resume scan history (Protected)
+- `GET /api/resume/:id` - Fetch details of a specific past resume ATS report (Protected)
 
 ---
 
-## 📡 API Endpoints
+## 🛠️ Installation & Getting Started
 
-### 🔐 Auth Routes
-
-```
-POST /auth/signup
-POST /auth/login
-GET /auth/profile
+### 1. Clone the Repository
+```bash
+git clone https://github.com/adi318krmu/RepoLens.git
+cd RepoLens
 ```
 
----
-
-### 📊 Analysis Routes
-
-```
-POST /api/analyze
-GET /api/analyze/history
-```
-
----
-
-## 🧪 Example Request
-
-### Analyze Repository
-
-```
-POST /api/analyze
+### 2. Configure Environment Variables
+Create a `.env` file in the `backend/` directory:
+```env
+PORT=3000
+MONGODB_URL=your_mongodb_connection_uri
+JWT_SECRET=your_jwt_signature_key
+GEMINI_API_KEY=your_gemini_api_key
+HF_TOKEN=your_huggingface_api_token
 ```
 
-```json
-{
-  "repoUrl": "https://github.com/facebook/react"
-}
+Create a `.env` file in the `frontend/` directory:
+```env
+VITE_API_BASE_URL=http://localhost:3000
 ```
 
----
+### 3. Install Dependencies
+```bash
+# Install backend dependencies
+cd backend
+npm install
 
-## 📦 Example Response
-
-```json
-{
-  "success": true,
-  "score": 7.5,
-  "status": "Good (Interview Ready)",
-  "analysis": {
-    "codeQuality": 7,
-    "readability": 8,
-    "bestPractices": 6,
-    "documentation": 7
-  }
-}
-```
-
----
-
-## 🛠️ Installation & Setup
-
-### 1. Clone the repo
-
-```
-git clone https://github.com/your-username/ai-github-analyzer.git
-cd ai-github-analyzer
-```
-
----
-
-### 2. Install dependencies
-
-```
+# Install frontend dependencies
+cd ../frontend
 npm install
 ```
 
----
+### 4. Run Development Servers
+```bash
+# Run backend server
+cd backend
+npm run dev
 
-### 3. Setup environment variables
-
-Create `.env` file:
-
-```
-PORT=3000
-MONGO_URI=your_mongodb_connection
-JWT_SECRET=your_secret_key
-GEMINI_API_KEY=your_api_key
-```
-
----
-
-### 4. Run the server
-
-```
+# Run frontend client
+cd ../frontend
 npm run dev
 ```
-
----
-
-## 🌐 Deployment
-
-* Deployed on Render
-* MongoDB Atlas for database
-
----
-
-## 🔥 Key Highlights
-
-* Combines AI + custom scoring logic
-* Not just an AI wrapper — includes evaluation system
-* Modular backend architecture
-* Scalable and production-ready design
-
----
-
-## 🎯 Future Improvements
-
-* Repository comparison feature
-* Resume analysis integration
-* Frontend dashboard (React)
-* Advanced AI evaluation
-
----
-
-## 👨‍💻 Author
-
-**Aditya Singh**
-Backend Developer
-
----
-
-## ⭐ Contributing
-
-Feel free to fork this repo and submit pull requests.
-
----
-
-## 📜 License
-
-This project is licensed under the MIT License.
+Open `http://localhost:5173` in your browser to experience RepoLens.
