@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
-import { analysisAPI } from "../services/api";
+import { analysisAPI, resumeAPI } from "../services/api";
 import { TableSkeleton } from "../components/LoadingSkeleton";
 import Button from "../components/Button";
 import { Search, SlidersHorizontal, Calendar, ArrowUpRight, FolderGit2 } from "lucide-react";
@@ -17,10 +17,26 @@ const History = () => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const data = await analysisAPI.getHistory();
-        if (data.success && data.history) {
-          setHistory(data.history);
+        const repoData = await analysisAPI.getHistory();
+        const resumeData = await resumeAPI.getHistory();
+        
+        let combinedHistory = [];
+        if (repoData.success && repoData.history) {
+          combinedHistory = [...repoData.history];
         }
+        if (resumeData.success && resumeData.history) {
+          const normalizedResume = resumeData.history.map(item => ({
+            ...item,
+            isResume: true,
+            score: (item.atsScore || item.analysis?.overall_score || 0) / 10,
+            status: item.eligibility || "Shortlisted",
+            repoUrl: `Resume: ${item.targetRole}` + (item.targetCompany ? ` at ${item.targetCompany}` : "")
+          }));
+          combinedHistory = [...combinedHistory, ...normalizedResume];
+        }
+        
+        combinedHistory.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setHistory(combinedHistory);
       } catch (err) {
         console.error("Failed to load history:", err);
       } finally {
@@ -34,7 +50,7 @@ const History = () => {
     const s = status.toLowerCase();
     if (s.includes("excellent")) return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
     if (s.includes("good")) return "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
-    if (s.includes("average") || s.includes("fair")) return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+    if (s.includes("average") || s.includes("fair") || s.includes("moderate")) return "bg-amber-500/10 text-amber-400 border-amber-500/20";
     return "bg-red-500/10 text-red-400 border-red-500/20";
   };
 
@@ -142,7 +158,7 @@ const History = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <Link to={`/analysis/${item._id}`}>
+                            <Link to={item.isResume ? `/resume-analyze?id=${item._id}` : `/analysis/${item._id}`}>
                               <Button size="sm" variant="ghost" className="opacity-80 group-hover:opacity-100 flex items-center gap-1 cursor-pointer">
                                 View Details <ArrowUpRight className="w-3.5 h-3.5" />
                               </Button>

@@ -36,6 +36,14 @@ export const authAPI = {
     const response = await api.get("/auth/profile");
     return response.data;
   },
+  updateProfilePicture: async (profilePicture) => {
+    const response = await api.put("/auth/profile/picture", { profilePicture });
+    return response.data;
+  },
+  removeProfilePicture: async () => {
+    const response = await api.delete("/auth/profile/picture");
+    return response.data;
+  },
 };
 
 export const analysisAPI = {

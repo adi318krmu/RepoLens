@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { analysisAPI } from "../services/api";
+import { analysisAPI, resumeAPI } from "../services/api";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { ScoreTrendsChart, RepoPerformanceChart } from "../components/AnalyticsCharts";
@@ -19,10 +19,25 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const data = await analysisAPI.getHistory();
-        if (data.success && data.history) {
-          setHistory(data.history);
+        const repoData = await analysisAPI.getHistory();
+        const resumeData = await resumeAPI.getHistory();
+        
+        let combinedHistory = [];
+        if (repoData.success && repoData.history) {
+          combinedHistory = [...repoData.history];
         }
+        if (resumeData.success && resumeData.history) {
+          const normalizedResume = resumeData.history.map(item => ({
+            ...item,
+            isResume: true,
+            score: (item.atsScore || item.analysis?.overall_score || 0) / 10,
+            repoUrl: `Resume: ${item.targetRole}` + (item.targetCompany ? ` at ${item.targetCompany}` : "")
+          }));
+          combinedHistory = [...combinedHistory, ...normalizedResume];
+        }
+        
+        combinedHistory.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setHistory(combinedHistory);
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
       } finally {
@@ -174,7 +189,7 @@ const Dashboard = () => {
                               <span className="text-sm text-slate-300 font-medium truncate max-w-md">{item.repoUrl}</span>
                               <div className="flex items-center gap-4">
                                 <span className="text-sm font-bold text-indigo-400">{item.score.toFixed(1)}</span>
-                                <Link to={`/analysis/${item._id}`}>
+                                <Link to={item.isResume ? `/resume-analyze?id=${item._id}` : `/analysis/${item._id}`}>
                                   <Button size="sm" variant="ghost" className="flex items-center gap-1 cursor-pointer">
                                     View <ArrowUpRight className="w-3.5 h-3.5" />
                                   </Button>

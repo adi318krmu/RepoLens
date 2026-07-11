@@ -68,7 +68,23 @@ const ResumeAnalyze = () => {
   };
 
   useEffect(() => {
-    fetchHistory();
+    const loadHistoryAndSelect = async () => {
+      await fetchHistory();
+      
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      if (id) {
+        try {
+          const data = await resumeAPI.getById(id);
+          if (data.success && data.analysis) {
+            setSelectedReport(data.analysis);
+          }
+        } catch (err) {
+          console.error("Failed to load report from URL ID:", err);
+        }
+      }
+    };
+    loadHistoryAndSelect();
   }, []);
 
   const handleDrag = (e) => {

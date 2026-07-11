@@ -21,6 +21,10 @@ const UserSchema = new Schema({
     required: true
     // ❌ remove maxlength
   },
+  profilePicture: {
+    type: String,
+    default: ""
+  },
   createdAt: {
     type: Date,
     default: Date.now

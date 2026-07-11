@@ -84,9 +84,13 @@ const Navbar = ({ onSearch, toggleSidebar }) => {
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center gap-2 p-1.5 rounded-full hover:bg-slate-800 transition-all focus:outline-none cursor-pointer"
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
-              {getInitials(user?.name)}
-            </div>
+            {user?.profilePicture ? (
+              <img src={user.profilePicture} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-slate-700" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                {getInitials(user?.name)}
+              </div>
+            )}
           </button>
 
           {dropdownOpen && (

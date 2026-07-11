@@ -146,4 +146,72 @@ async function getProfile(req, res) {
   }
 }
 
-module.exports = { signupUser, loginUser, getProfile };
+async function updateProfilePicture(req, res) {
+  const { profilePicture } = req.body;
+  if (!profilePicture) {
+    return res.status(400).json({
+      success: false,
+      message: "Profile picture data is required"
+    });
+  }
+
+  try {
+    const user = getDbStatus()
+      ? await User.findByIdAndUpdate(req.user.id, { profilePicture }, { new: true }).select("-password")
+      : await updateUserProfilePictureLocal(req.user.id, profilePicture);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture updated successfully",
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    console.error("UPDATE PROFILE PICTURE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update profile picture"
+    });
+  }
+}
+
+async function removeProfilePicture(req, res) {
+  try {
+    const user = getDbStatus()
+      ? await User.findByIdAndUpdate(req.user.id, { profilePicture: "" }, { new: true }).select("-password")
+      : await updateUserProfilePictureLocal(req.user.id, "");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture removed successfully",
+      user: sanitizeUser(user)
+    });
+  } catch (error) {
+    console.error("REMOVE PROFILE PICTURE ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to remove profile picture"
+    });
+  }
+}
+
+// Local helper wrapper
+async function updateUserProfilePictureLocal(id, profilePicture) {
+  const { updateUserProfilePicture } = require("../services/localStore");
+  return await updateUserProfilePicture(id, profilePicture);
+}
+
+module.exports = { signupUser, loginUser, getProfile, updateProfilePicture, removeProfilePicture };

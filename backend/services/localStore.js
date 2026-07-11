@@ -126,6 +126,16 @@ async function getResumeHistory(userId) {
   return [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 }
 
+async function updateUserProfilePicture(id, profilePicture) {
+  const data = await readData();
+  const index = data.users.findIndex((user) => user._id === id);
+  if (index === -1) return null;
+  data.users[index].profilePicture = profilePicture;
+  data.users[index].updatedAt = new Date().toISOString();
+  await writeData(data);
+  return data.users[index];
+}
+
 module.exports = {
   createAnalysis,
   createUser,
@@ -133,5 +143,6 @@ module.exports = {
   findUserById,
   getHistory,
   createResumeAnalysis,
-  getResumeHistory
+  getResumeHistory,
+  updateUserProfilePicture
 };

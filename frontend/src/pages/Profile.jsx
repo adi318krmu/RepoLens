@@ -2,25 +2,41 @@ import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
-import { analysisAPI } from "../services/api";
+import { analysisAPI, resumeAPI, authAPI } from "../services/api";
 import { CardSkeleton } from "../components/LoadingSkeleton";
-import { User, Mail, Database, Award, BarChart2, Calendar, ArrowRight } from "lucide-react";
+import { User, Mail, Database, Award, BarChart2, Calendar, ArrowRight, Camera, Loader2, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Button from "../components/Button";
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [updatingPic, setUpdatingPic] = useState(false);
 
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const data = await analysisAPI.getHistory();
-        if (data.success && data.history) {
-          setHistory(data.history);
+        const repoData = await analysisAPI.getHistory();
+        const resumeData = await resumeAPI.getHistory();
+        
+        let combinedHistory = [];
+        if (repoData.success && repoData.history) {
+          combinedHistory = [...repoData.history];
         }
+        if (resumeData.success && resumeData.history) {
+          const normalizedResume = resumeData.history.map(item => ({
+            ...item,
+            isResume: true,
+            score: (item.atsScore || item.analysis?.overall_score || 0) / 10,
+            repoUrl: `Resume: ${item.targetRole}` + (item.targetCompany ? ` at ${item.targetCompany}` : "")
+          }));
+          combinedHistory = [...combinedHistory, ...normalizedResume];
+        }
+        
+        combinedHistory.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setHistory(combinedHistory);
       } catch (err) {
         console.error("Failed to load history on profile:", err);
       } finally {
@@ -29,6 +45,51 @@ const Profile = () => {
     };
     fetchHistory();
   }, []);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image size must be less than 2MB");
+      return;
+    }
+
+    setUpdatingPic(true);
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = async () => {
+      try {
+        const base64data = reader.result;
+        const res = await authAPI.updateProfilePicture(base64data);
+        if (res.success && res.user) {
+          updateUser(res.user);
+        }
+      } catch (err) {
+        console.error("Failed to upload profile picture:", err);
+        alert("Failed to update profile picture");
+      } finally {
+        setUpdatingPic(false);
+      }
+    };
+  };
+
+  const handleImageRemove = async () => {
+    if (!window.confirm("Are you sure you want to remove your profile picture?")) return;
+    
+    setUpdatingPic(true);
+    try {
+      const res = await authAPI.removeProfilePicture();
+      if (res.success && res.user) {
+        updateUser(res.user);
+      }
+    } catch (err) {
+      console.error("Failed to remove profile picture:", err);
+      alert("Failed to remove profile picture");
+    } finally {
+      setUpdatingPic(false);
+    }
+  };
 
   const totalScans = history.length;
   const avgScore = totalScans
@@ -59,9 +120,44 @@ const Profile = () => {
               <div className="bg-[#1E293B] border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden glow-card">
                 <div className="absolute top-0 right-0 w-[120px] h-[120px] bg-indigo-500/5 rounded-full pointer-events-none blur-xl" />
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold font-display shadow-lg shadow-indigo-500/10 mb-4 animate-pulse">
-                    {user?.name ? user.name.substring(0, 2).toUpperCase() : "U"}
+                  <div className="relative group/avatar mb-4">
+                    {user?.profilePicture ? (
+                      <img 
+                        src={user.profilePicture} 
+                        alt="Profile" 
+                        className="w-20 h-20 rounded-full object-cover shadow-lg border border-slate-700"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold font-display shadow-lg shadow-indigo-500/10">
+                        {user?.name ? user.name.substring(0, 2).toUpperCase() : "U"}
+                      </div>
+                    )}
+                    
+                    {updatingPic && (
+                      <div className="absolute inset-0 rounded-full bg-slate-950/70 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+                      </div>
+                    )}
                   </div>
+
+                  <div className="flex gap-2 mb-4">
+                    <label className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-1 rounded cursor-pointer transition-colors border border-slate-700 flex items-center gap-1">
+                      <Camera className="w-3 h-3" />
+                      {user?.profilePicture ? "Update Pic" : "Upload Pic"}
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={updatingPic} />
+                    </label>
+                    {user?.profilePicture && (
+                      <button 
+                        onClick={handleImageRemove}
+                        disabled={updatingPic}
+                        className="text-[10px] bg-red-950/40 hover:bg-red-900/40 text-red-400 font-bold px-2 py-1 rounded cursor-pointer transition-colors border border-red-900/30 flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
                   <h2 className="text-lg font-bold text-white font-display">{user?.name}</h2>
                   <p className="text-xs text-slate-500 mt-1">RepoLens Grader User</p>
 
@@ -187,7 +283,7 @@ const Profile = () => {
                               </span>
                               <span className="text-[10px] text-slate-500 font-medium"> / 10.0</span>
                             </div>
-                            <Link to={`/analysis/${item._id}`}>
+                            <Link to={item.isResume ? `/resume-analyze?id=${item._id}` : `/analysis/${item._id}`}>
                               <Button size="sm" variant="ghost" className="opacity-80 group-hover:opacity-100 flex items-center gap-1 cursor-pointer">
                                 View <ArrowRight className="w-3.5 h-3.5" />
                               </Button>
