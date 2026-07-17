@@ -51,13 +51,6 @@ async function signupUser(req, res) {
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Send verification email
-    await sendEmail({
-      to: normalizedEmail,
-      subject: "Verify Your RepoLens Account",
-      html: getVerificationTemplate(name, otp)
-    });
-
     const user = getDbStatus()
       ? await User.create({
           name,
@@ -81,6 +74,15 @@ async function signupUser(req, res) {
         verificationOTPExpires: otpExpires.toISOString()
       });
     }
+
+    // Send verification email in background (non-blocking)
+    sendEmail({
+      to: normalizedEmail,
+      subject: "Verify Your RepoLens Account",
+      html: getVerificationTemplate(name, otp)
+    }).catch(err => {
+      console.error("Failed to send signup verification email in background:", err);
+    });
 
     return res.status(201).json({
       success: true,
@@ -337,12 +339,6 @@ async function resendOTP(req, res) {
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    await sendEmail({
-      to: normalizedEmail,
-      subject: "Verify Your RepoLens Account",
-      html: getVerificationTemplate(user.name ?? user?._doc?.name, otp)
-    });
-
     if (getDbStatus()) {
       user.verificationOTP = otp;
       user.verificationOTPExpires = otpExpires;
@@ -354,6 +350,15 @@ async function resendOTP(req, res) {
         verificationOTPExpires: otpExpires.toISOString()
       });
     }
+
+    // Send verification email in background (non-blocking)
+    sendEmail({
+      to: normalizedEmail,
+      subject: "Verify Your RepoLens Account",
+      html: getVerificationTemplate(user.name ?? user?._doc?.name, otp)
+    }).catch(err => {
+      console.error("Failed to send resendOTP email in background:", err);
+    });
 
     return res.status(200).json({
       success: true,
@@ -394,12 +399,6 @@ async function forgotPassword(req, res) {
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    await sendEmail({
-      to: normalizedEmail,
-      subject: "Reset Your RepoLens Password",
-      html: getResetTemplate(user.name ?? user?._doc?.name, otp)
-    });
-
     if (getDbStatus()) {
       user.resetOTP = otp;
       user.resetOTPExpires = otpExpires;
@@ -411,6 +410,15 @@ async function forgotPassword(req, res) {
         resetOTPExpires: otpExpires.toISOString()
       });
     }
+
+    // Send reset email in background (non-blocking)
+    sendEmail({
+      to: normalizedEmail,
+      subject: "Reset Your RepoLens Password",
+      html: getResetTemplate(user.name ?? user?._doc?.name, otp)
+    }).catch(err => {
+      console.error("Failed to send forgot password email in background:", err);
+    });
 
     return res.status(200).json({
       success: true,
