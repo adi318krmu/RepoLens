@@ -41,9 +41,11 @@ export const AuthProvider = ({ children }) => {
       }
       return { success: false, message: data.message || "Login failed" };
     } catch (err) {
+      const errorData = err.response?.data;
       return {
         success: false,
-        message: err.response?.data?.message || "Invalid credentials",
+        message: errorData?.message || "Invalid credentials",
+        verified: errorData?.verified ?? true,
       };
     }
   };
@@ -51,11 +53,15 @@ export const AuthProvider = ({ children }) => {
   const signup = async (name, email, password) => {
     try {
       const data = await authAPI.signup(name, email, password);
-      if (data.success && data.token) {
-        localStorage.setItem("token", data.token);
-        setToken(data.token);
-        setUser(data.user);
-        return { success: true };
+      if (data.success) {
+        // If they bypass verification or database fallback sets verified directly:
+        if (data.token && data.user && data.user.verified) {
+          localStorage.setItem("token", data.token);
+          setToken(data.token);
+          setUser(data.user);
+          return { success: true, verified: true };
+        }
+        return { success: true, verified: false, email: data.email || email, message: data.message };
       }
       return { success: false, message: data.message || "Signup failed" };
     } catch (err) {

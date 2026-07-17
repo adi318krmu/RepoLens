@@ -52,6 +52,11 @@ async function createUser({ name, email, password }) {
     name,
     email: email.toLowerCase(),
     password,
+    verified: false,
+    verificationOTP: null,
+    verificationOTPExpires: null,
+    resetOTP: null,
+    resetOTPExpires: null,
     createdAt: now,
     updatedAt: now
   };
@@ -136,6 +141,24 @@ async function updateUserProfilePicture(id, profilePicture) {
   return data.users[index];
 }
 
+async function updateUserFields(id, fields) {
+  const data = await readData();
+  const index = data.users.findIndex((user) => user._id === id);
+  if (index === -1) return null;
+  data.users[index] = { ...data.users[index], ...fields, updatedAt: new Date().toISOString() };
+  await writeData(data);
+  return data.users[index];
+}
+
+async function updateUserByEmailFields(email, fields) {
+  const data = await readData();
+  const index = data.users.findIndex((user) => user.email === email.toLowerCase());
+  if (index === -1) return null;
+  data.users[index] = { ...data.users[index], ...fields, updatedAt: new Date().toISOString() };
+  await writeData(data);
+  return data.users[index];
+}
+
 module.exports = {
   createAnalysis,
   createUser,
@@ -144,5 +167,7 @@ module.exports = {
   getHistory,
   createResumeAnalysis,
   getResumeHistory,
-  updateUserProfilePicture
+  updateUserProfilePicture,
+  updateUserFields,
+  updateUserByEmailFields
 };

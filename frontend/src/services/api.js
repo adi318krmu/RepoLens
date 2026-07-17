@@ -64,6 +64,26 @@ export const authAPI = {
     const response = await api.delete("/auth/profile/picture");
     return response.data;
   },
+  verifyEmail: async (email, otp) => {
+    const response = await api.post("/auth/verify-email", { email, otp });
+    return response.data;
+  },
+  resendOTP: async (email) => {
+    const response = await api.post("/auth/resend-otp", { email });
+    return response.data;
+  },
+  forgotPassword: async (email) => {
+    const response = await api.post("/auth/forgot-password", { email });
+    return response.data;
+  },
+  verifyResetOTP: async (email, otp) => {
+    const response = await api.post("/auth/verify-reset-otp", { email, otp });
+    return response.data;
+  },
+  resetPassword: async (email, otp, newPassword) => {
+    const response = await api.post("/auth/reset-password", { email, otp, newPassword });
+    return response.data;
+  },
 };
 
 export const analysisAPI = {

@@ -25,6 +25,22 @@ const UserSchema = new Schema({
     type: String,
     default: ""
   },
+  verified: {
+    type: Boolean,
+    default: false
+  },
+  verificationOTP: {
+    type: String
+  },
+  verificationOTPExpires: {
+    type: Date
+  },
+  resetOTP: {
+    type: String
+  },
+  resetOTPExpires: {
+    type: Date
+  },
   createdAt: {
     type: Date,
     default: Date.now

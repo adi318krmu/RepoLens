@@ -11,6 +11,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [notVerified, setNotVerified] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -19,6 +20,7 @@ const Login = () => {
       return setError("All fields are required");
     }
     setError("");
+    setNotVerified(false);
     setLoading(true);
 
     const result = await login(email, password);
@@ -27,6 +29,9 @@ const Login = () => {
       navigate("/dashboard");
     } else {
       setError(result.message || "Invalid credentials");
+      if (result.verified === false) {
+        setNotVerified(true);
+      }
     }
   };
 
@@ -51,8 +56,16 @@ const Login = () => {
 
         {/* Error alert */}
         {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold rounded-lg">
-            {error}
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold rounded-lg flex flex-col gap-1">
+            <span>{error}</span>
+            {notVerified && (
+              <Link
+                to={`/verify-email?email=${encodeURIComponent(email)}`}
+                className="text-indigo-400 hover:text-indigo-300 underline font-semibold mt-1 self-start cursor-pointer"
+              >
+                Verify your email now &rarr;
+              </Link>
+            )}
           </div>
         )}
 
@@ -76,6 +89,9 @@ const Login = () => {
           <div>
             <div className="flex justify-between items-center mb-1.5">
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Password</label>
+              <Link to="/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer">
+                Forgot Password?
+              </Link>
             </div>
             <div className="relative flex items-center">
               <Lock className="w-4 h-4 text-slate-500 absolute left-3 pointer-events-none" />

@@ -3,6 +3,8 @@ const bcrypt = require("bcrypt");
 const User = require("../model/userSchema");
 const authSecret = require("../utils/authSecret");
 const { getDbStatus } = require("../model/dbConnect");
+const { generateOTP } = require("../utils/otp");
+const { sendEmail, getVerificationTemplate, getResetTemplate } = require("../services/emailService");
 const {
   createUser: createLocalUser,
   findUserByEmail: findLocalUserByEmail,
@@ -12,7 +14,7 @@ const {
 function sanitizeUser(user) {
   const rawUser = user?._doc ?? user;
   if (!rawUser) return null;
-  const { password, ...safeUser } = rawUser;
+  const { password, verificationOTP, verificationOTPExpires, resetOTP, resetOTPExpires, ...safeUser } = rawUser;
   return safeUser;
 }
 
@@ -46,26 +48,50 @@ async function signupUser(req, res) {
       });
     }
 
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Send verification email
+    await sendEmail({
+      to: normalizedEmail,
+      subject: "Verify Your RepoLens Account",
+      html: getVerificationTemplate(name, otp)
+    });
+
     const user = getDbStatus()
-      ? await User.create({ name, email: normalizedEmail, password })
+      ? await User.create({
+          name,
+          email: normalizedEmail,
+          password,
+          verified: false,
+          verificationOTP: otp,
+          verificationOTPExpires: otpExpires
+        })
       : await createLocalUser({
           name,
           email: normalizedEmail,
           password: await bcrypt.hash(password, 10)
         });
-    const token = jwt.sign({ id: user._id }, authSecret, { expiresIn: "1d" });
+
+    if (!getDbStatus()) {
+      const { updateUserFields } = require("../services/localStore");
+      await updateUserFields(user._id, {
+        verified: false,
+        verificationOTP: otp,
+        verificationOTPExpires: otpExpires.toISOString()
+      });
+    }
 
     return res.status(201).json({
       success: true,
-      message: "User created",
-      token,
-      user: sanitizeUser(user)
+      message: "Registration successful. Please verify your email using the OTP sent.",
+      email: normalizedEmail
     });
   } catch (error) {
     console.error("SIGNUP ERROR:", error);
     return res.status(500).json({
       success: false,
-      message: "Unable to create account"
+      message: "Unable to create account or send verification email"
     });
   }
 }
@@ -100,6 +126,15 @@ async function loginUser(req, res) {
       return res.status(400).json({
         success: false,
         message: "Invalid credentials"
+      });
+    }
+
+    const isVerified = user.verified ?? user?._doc?.verified;
+    if (!isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email not verified. Please verify your email first.",
+        verified: false
       });
     }
 
@@ -208,10 +243,316 @@ async function removeProfilePicture(req, res) {
   }
 }
 
+async function verifyEmail(req, res) {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and OTP are required"
+    });
+  }
+
+  try {
+    const normalizedEmail = email.toLowerCase();
+    const user = getDbStatus()
+      ? await User.findOne({ email: normalizedEmail })
+      : await findLocalUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const userOtp = user.verificationOTP ?? user?._doc?.verificationOTP;
+    const userOtpExpires = user.verificationOTPExpires ?? user?._doc?.verificationOTPExpires;
+
+    if (!userOtp || userOtp !== otp || new Date(userOtpExpires) < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP"
+      });
+    }
+
+    if (getDbStatus()) {
+      user.verified = true;
+      user.verificationOTP = undefined;
+      user.verificationOTPExpires = undefined;
+      await user.save();
+    } else {
+      const { updateUserFields } = require("../services/localStore");
+      await updateUserFields(user._id, {
+        verified: true,
+        verificationOTP: null,
+        verificationOTPExpires: null
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully. You can now log in."
+    });
+  } catch (error) {
+    console.error("VERIFY EMAIL ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to verify email"
+    });
+  }
+}
+
+async function resendOTP(req, res) {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: "Email is required"
+    });
+  }
+
+  try {
+    const normalizedEmail = email.toLowerCase();
+    const user = getDbStatus()
+      ? await User.findOne({ email: normalizedEmail })
+      : await findLocalUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const isVerified = user.verified ?? user?._doc?.verified;
+    if (isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is already verified"
+      });
+    }
+
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await sendEmail({
+      to: normalizedEmail,
+      subject: "Verify Your RepoLens Account",
+      html: getVerificationTemplate(user.name ?? user?._doc?.name, otp)
+    });
+
+    if (getDbStatus()) {
+      user.verificationOTP = otp;
+      user.verificationOTPExpires = otpExpires;
+      await user.save();
+    } else {
+      const { updateUserFields } = require("../services/localStore");
+      await updateUserFields(user._id, {
+        verificationOTP: otp,
+        verificationOTPExpires: otpExpires.toISOString()
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "A new OTP has been sent to your email."
+    });
+  } catch (error) {
+    console.error("RESEND OTP ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to resend OTP"
+    });
+  }
+}
+
+async function forgotPassword(req, res) {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: "Email is required"
+    });
+  }
+
+  try {
+    const normalizedEmail = email.toLowerCase();
+    const user = getDbStatus()
+      ? await User.findOne({ email: normalizedEmail })
+      : await findLocalUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await sendEmail({
+      to: normalizedEmail,
+      subject: "Reset Your RepoLens Password",
+      html: getResetTemplate(user.name ?? user?._doc?.name, otp)
+    });
+
+    if (getDbStatus()) {
+      user.resetOTP = otp;
+      user.resetOTPExpires = otpExpires;
+      await user.save();
+    } else {
+      const { updateUserFields } = require("../services/localStore");
+      await updateUserFields(user._id, {
+        resetOTP: otp,
+        resetOTPExpires: otpExpires.toISOString()
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset OTP sent to your email."
+    });
+  } catch (error) {
+    console.error("FORGOT PASSWORD ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to send reset password OTP"
+    });
+  }
+}
+
+async function verifyResetOTP(req, res) {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and OTP are required"
+    });
+  }
+
+  try {
+    const normalizedEmail = email.toLowerCase();
+    const user = getDbStatus()
+      ? await User.findOne({ email: normalizedEmail })
+      : await findLocalUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const resetOtp = user.resetOTP ?? user?._doc?.resetOTP;
+    const resetOtpExpires = user.resetOTPExpires ?? user?._doc?.resetOTPExpires;
+
+    if (!resetOtp || resetOtp !== otp || new Date(resetOtpExpires) < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP verified. You can now reset your password."
+    });
+  } catch (error) {
+    console.error("VERIFY RESET OTP ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to verify reset OTP"
+    });
+  }
+}
+
+async function resetPassword(req, res) {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: "Email, OTP and new password are required"
+    });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 6 characters"
+    });
+  }
+
+  try {
+    const normalizedEmail = email.toLowerCase();
+    const user = getDbStatus()
+      ? await User.findOne({ email: normalizedEmail })
+      : await findLocalUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    const resetOtp = user.resetOTP ?? user?._doc?.resetOTP;
+    const resetOtpExpires = user.resetOTPExpires ?? user?._doc?.resetOTPExpires;
+
+    if (!resetOtp || resetOtp !== otp || new Date(resetOtpExpires) < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired OTP"
+      });
+    }
+
+    if (getDbStatus()) {
+      user.password = newPassword;
+      user.resetOTP = undefined;
+      user.resetOTPExpires = undefined;
+      await user.save();
+    } else {
+      const { updateUserFields } = require("../services/localStore");
+      await updateUserFields(user._id, {
+        password: await bcrypt.hash(newPassword, 10),
+        resetOTP: null,
+        resetOTPExpires: null
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successful. You can now log in."
+    });
+  } catch (error) {
+    console.error("RESET PASSWORD ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to reset password"
+    });
+  }
+}
+
 // Local helper wrapper
 async function updateUserProfilePictureLocal(id, profilePicture) {
   const { updateUserProfilePicture } = require("../services/localStore");
   return await updateUserProfilePicture(id, profilePicture);
 }
 
-module.exports = { signupUser, loginUser, getProfile, updateProfilePicture, removeProfilePicture };
+module.exports = {
+  signupUser,
+  loginUser,
+  getProfile,
+  updateProfilePicture,
+  removeProfilePicture,
+  verifyEmail,
+  resendOTP,
+  forgotPassword,
+  verifyResetOTP,
+  resetPassword
+};

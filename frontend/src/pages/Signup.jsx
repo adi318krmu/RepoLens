@@ -32,7 +32,11 @@ const Signup = () => {
     const result = await signup(name, email, password);
     setLoading(false);
     if (result.success) {
-      navigate("/dashboard");
+      if (result.verified) {
+        navigate("/dashboard");
+      } else {
+        navigate(`/verify-email?email=${encodeURIComponent(result.email || email)}`);
+      }
     } else {
       setError(result.message || "Failed to create account");
     }
