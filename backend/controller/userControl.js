@@ -42,9 +42,47 @@ async function signupUser(req, res) {
       : await findLocalUserByEmail(normalizedEmail);
 
     if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "User already exists"
+      const isVerified = existingUser.verified ?? existingUser?._doc?.verified;
+      if (isVerified) {
+        return res.status(400).json({
+          success: false,
+          message: "User already exists. Please log in."
+        });
+      }
+
+      // User exists but is unverified: update details and generate a fresh OTP
+      const otp = generateOTP();
+      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+      if (getDbStatus()) {
+        existingUser.name = name;
+        existingUser.password = password;
+        existingUser.verificationOTP = otp;
+        existingUser.verificationOTPExpires = otpExpires;
+        await existingUser.save();
+      } else {
+        const { updateUserFields } = require("../services/localStore");
+        await updateUserFields(existingUser._id, {
+          name,
+          password: await bcrypt.hash(password, 10),
+          verificationOTP: otp,
+          verificationOTPExpires: otpExpires.toISOString()
+        });
+      }
+
+      // Send verification email in background (non-blocking for fast UI response)
+      sendEmail({
+        to: normalizedEmail,
+        subject: "Verify Your RepoLens Account",
+        html: getVerificationTemplate(name, otp)
+      }).catch(err => {
+        console.error("Failed to send signup verification email in background:", err);
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Registration updated. Please verify your email using the OTP sent.",
+        email: normalizedEmail
       });
     }
 
@@ -75,31 +113,14 @@ async function signupUser(req, res) {
       });
     }
 
-    // Send verification email
-    try {
-      await sendEmail({
-        to: normalizedEmail,
-        subject: "Verify Your RepoLens Account",
-        html: getVerificationTemplate(name, otp)
-      });
-    } catch (err) {
-      console.error("Failed to send signup verification email:", err);
-      // Clean up user record
-      try {
-        if (getDbStatus()) {
-          await User.deleteOne({ _id: user._id });
-        } else {
-          const { deleteUserLocal } = require("../services/localStore");
-          await deleteUserLocal(user._id);
-        }
-      } catch (cleanupErr) {
-        console.error("Failed to clean up user record after email failure:", cleanupErr);
-      }
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send verification email. Please check your email configuration or try again."
-      });
-    }
+    // Send verification email in background (non-blocking for fast UI response)
+    sendEmail({
+      to: normalizedEmail,
+      subject: "Verify Your RepoLens Account",
+      html: getVerificationTemplate(name, otp)
+    }).catch(err => {
+      console.error("Failed to send signup verification email in background:", err);
+    });
 
     return res.status(201).json({
       success: true,
