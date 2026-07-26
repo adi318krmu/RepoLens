@@ -1,5 +1,5 @@
 const { getRepoData } = require("../services/githubService");
-const { analyzeWithAI } = require("../services/geminiService");
+const { analyzeGithubRepoWithAI } = require("../services/aiService");
 const extractRepoDetails = require("../utils/extractRepo");
 const { calculateScore, getStatus } = require("../services/scoringService");
 const Analysis = require("../model/Analysis");
@@ -9,16 +9,22 @@ const {
   getHistory: getLocalHistory
 } = require("../services/localStore");
 
-function fallbackAnalysis(message = "AI unavailable") {
+function fallbackAnalysis(message = "AI microservice unavailable") {
   return {
-    codeQuality: 5,
-    readability: 5,
-    bestPractices: 5,
-    documentation: 5,
+    detectedStack: { languages: [], frameworks: [], databases: [], tools: [] },
+    codeQuality: { score: 5, strengths: [], issues: [message] },
+    architecture: { score: 5, strengths: [], issues: [] },
+    documentation: { score: 5, issues: [] },
+    testing: { score: 5, issues: [] },
+    security: { score: 5, issues: [] },
+    maintainability: { score: 5, issues: [] },
+    interviewReadiness: { score: 5, reason: message },
     strengths: ["Repository data was collected successfully"],
-    issues: [message],
-    suggestions: ["Try again later"],
-    summary: "AI analysis could not be completed, so a neutral score was used."
+    criticalIssues: [message],
+    recommendations: [],
+    confidenceScore: { score: 40, level: "Low" },
+    aiAvailable: false,
+    aiError: message
   };
 }
 
@@ -33,12 +39,12 @@ async function analyzeRepo(req, res) {
       });
     }
 
-    let repoData = { readme: "", files: [] };
+    let repoPackage;
     let repoDetails;
 
     try {
       repoDetails = extractRepoDetails(repoUrl);
-      repoData = await getRepoData(repoDetails.owner, repoDetails.repo);
+      repoPackage = await getRepoData(repoDetails.owner, repoDetails.repo);
     } catch (error) {
       if (!repoDetails) {
         return res.status(400).json({
@@ -46,33 +52,47 @@ async function analyzeRepo(req, res) {
           message: error.message
         });
       }
-      repoData = { readme: "", files: [], metadata: null };
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Failed to collect GitHub repository data"
+      });
     }
 
     let aiResult;
 
     try {
-      aiResult = await analyzeWithAI({
-        readme: repoData.readme,
-        files: repoData.files
-      });
-    } catch (_error) {
-      aiResult = fallbackAnalysis("AI unavailable");
+      aiResult = await analyzeGithubRepoWithAI(repoPackage);
+    } catch (aiErr) {
+      console.warn("AI Microservice call failed, falling back to static analysis representation:", aiErr.message);
+      aiResult = fallbackAnalysis("AI microservice temporarily unavailable");
     }
 
     const finalScore = calculateScore(aiResult);
     const status = getStatus(finalScore);
 
+    // Prepare legacy UI compatibility attributes
+    const strengthsList = aiResult.strengths || [];
+    const issuesList = aiResult.criticalIssues || aiResult.codeQuality?.issues || [];
+    const suggestionsList = (aiResult.recommendations || []).map(r => `${r.title}: ${r.suggestion}`);
+    const summaryText = aiResult.interviewReadiness?.reason || "Repository analysis completed.";
+
+    const scoresBreakdown = {
+      codeQuality: aiResult.codeQuality?.score ?? 6,
+      readability: aiResult.architecture?.score ?? 6,
+      bestPractices: aiResult.maintainability?.score ?? 6,
+      documentation: aiResult.documentation?.score ?? 6
+    };
+
     const savedAnalysis = getDbStatus()
       ? await Analysis.create({
-          userId: req.user.id,
+          userId: req.user ? req.user.id : null,
           repoUrl,
           score: finalScore,
           status,
           analysis: aiResult
         })
       : await createLocalAnalysis({
-          userId: req.user.id,
+          userId: req.user ? req.user.id : null,
           repoUrl,
           score: finalScore,
           status,
@@ -86,27 +106,21 @@ async function analyzeRepo(req, res) {
       status,
       verdict: status,
       analysis: aiResult,
-      scores: {
-        codeQuality: aiResult.codeQuality,
-        readability: aiResult.readability,
-        bestPractices: aiResult.bestPractices,
-        documentation: aiResult.documentation
-      },
-      strengths: aiResult.strengths,
-      issues: aiResult.issues,
-      suggestions: aiResult.suggestions,
-      summary: aiResult.summary,
+      scores: scoresBreakdown,
+      strengths: strengthsList,
+      issues: issuesList,
+      suggestions: suggestionsList,
+      summary: summaryText,
       repo: repoDetails ? `${repoDetails.owner}/${repoDetails.repo}` : repoUrl,
       repository: repoUrl,
       tags: [
-        repoData.metadata?.language,
-        repoData.metadata?.license?.spdx_id,
-        repoData.metadata?.private === false ? "public" : null
-      ].filter(Boolean),
+        ...(aiResult.detectedStack?.languages || []),
+        ...(aiResult.detectedStack?.frameworks || [])
+      ].slice(0, 5),
       savedAnalysis
     });
   } catch (error) {
-    console.error("ANALYSIS ERROR:", error);
+    console.error("ANALYSIS CONTROLLER ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Unable to analyze repository"
@@ -147,6 +161,19 @@ async function getAnalysisById(req, res) {
     }
 
     const raw = analysis._doc ?? analysis;
+    const aiData = raw.analysis || {};
+
+    const strengthsList = aiData.strengths || [];
+    const issuesList = aiData.criticalIssues || aiData.codeQuality?.issues || [];
+    const suggestionsList = (aiData.recommendations || []).map(r => `${r.title}: ${r.suggestion}`);
+    const summaryText = aiData.interviewReadiness?.reason || "Repository analysis report.";
+
+    const scoresBreakdown = {
+      codeQuality: aiData.codeQuality?.score ?? 6,
+      readability: aiData.architecture?.score ?? 6,
+      bestPractices: aiData.maintainability?.score ?? 6,
+      documentation: aiData.documentation?.score ?? 6
+    };
 
     return res.json({
       success: true,
@@ -154,17 +181,12 @@ async function getAnalysisById(req, res) {
       overallScore: raw.score,
       status: raw.status,
       verdict: raw.status,
-      analysis: raw.analysis,
-      scores: {
-        codeQuality: raw.analysis?.codeQuality,
-        readability: raw.analysis?.readability,
-        bestPractices: raw.analysis?.bestPractices,
-        documentation: raw.analysis?.documentation
-      },
-      strengths: raw.analysis?.strengths || [],
-      issues: raw.analysis?.issues || [],
-      suggestions: raw.analysis?.suggestions || [],
-      summary: raw.analysis?.summary || "",
+      analysis: aiData,
+      scores: scoresBreakdown,
+      strengths: strengthsList,
+      issues: issuesList,
+      suggestions: suggestionsList,
+      summary: summaryText,
       repo: raw.repoUrl,
       repository: raw.repoUrl,
       createdAt: raw.createdAt
