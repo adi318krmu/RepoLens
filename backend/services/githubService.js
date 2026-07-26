@@ -232,7 +232,15 @@ async function getRepoData(owner, repo) {
 
   } catch (error) {
     console.error("Error in getRepoData:", error.message);
-    throw new Error(error.response?.status === 404 ? "GitHub repository not found" : "Error fetching GitHub repo");
+    let msg = "Error fetching GitHub repo";
+    if (error.response?.status === 404) {
+      msg = "GitHub repository not found or private. Please check that the URL is public and spelled correctly.";
+    } else if (error.response?.status === 403 || error.response?.status === 429) {
+      msg = "GitHub API rate limit exceeded or access denied. Please try again later or configure a GITHUB_TOKEN in your backend environment.";
+    } else if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+      msg = "Connection to GitHub timed out. Please try again.";
+    }
+    throw new Error(msg);
   }
 }
 
