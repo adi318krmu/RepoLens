@@ -75,14 +75,31 @@ async function signupUser(req, res) {
       });
     }
 
-    // Send verification email in background (non-blocking)
-    sendEmail({
-      to: normalizedEmail,
-      subject: "Verify Your RepoLens Account",
-      html: getVerificationTemplate(name, otp)
-    }).catch(err => {
-      console.error("Failed to send signup verification email in background:", err);
-    });
+    // Send verification email
+    try {
+      await sendEmail({
+        to: normalizedEmail,
+        subject: "Verify Your RepoLens Account",
+        html: getVerificationTemplate(name, otp)
+      });
+    } catch (err) {
+      console.error("Failed to send signup verification email:", err);
+      // Clean up user record
+      try {
+        if (getDbStatus()) {
+          await User.deleteOne({ _id: user._id });
+        } else {
+          const { deleteUserLocal } = require("../services/localStore");
+          await deleteUserLocal(user._id);
+        }
+      } catch (cleanupErr) {
+        console.error("Failed to clean up user record after email failure:", cleanupErr);
+      }
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification email. Please check your email configuration or try again."
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -351,14 +368,20 @@ async function resendOTP(req, res) {
       });
     }
 
-    // Send verification email in background (non-blocking)
-    sendEmail({
-      to: normalizedEmail,
-      subject: "Verify Your RepoLens Account",
-      html: getVerificationTemplate(user.name ?? user?._doc?.name, otp)
-    }).catch(err => {
-      console.error("Failed to send resendOTP email in background:", err);
-    });
+    // Send verification email
+    try {
+      await sendEmail({
+        to: normalizedEmail,
+        subject: "Verify Your RepoLens Account",
+        html: getVerificationTemplate(user.name ?? user?._doc?.name, otp)
+      });
+    } catch (err) {
+      console.error("Failed to send resendOTP email:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP email. Please check your email configuration or try again."
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -411,14 +434,20 @@ async function forgotPassword(req, res) {
       });
     }
 
-    // Send reset email in background (non-blocking)
-    sendEmail({
-      to: normalizedEmail,
-      subject: "Reset Your RepoLens Password",
-      html: getResetTemplate(user.name ?? user?._doc?.name, otp)
-    }).catch(err => {
-      console.error("Failed to send forgot password email in background:", err);
-    });
+    // Send reset email
+    try {
+      await sendEmail({
+        to: normalizedEmail,
+        subject: "Reset Your RepoLens Password",
+        html: getResetTemplate(user.name ?? user?._doc?.name, otp)
+      });
+    } catch (err) {
+      console.error("Failed to send forgot password email:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send password reset OTP. Please check your email configuration or try again."
+      });
+    }
 
     return res.status(200).json({
       success: true,

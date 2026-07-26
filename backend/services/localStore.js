@@ -159,6 +159,12 @@ async function updateUserByEmailFields(email, fields) {
   return data.users[index];
 }
 
+async function deleteUserLocal(id) {
+  const data = await readData();
+  data.users = data.users.filter((user) => user._id !== id);
+  await writeData(data);
+}
+
 module.exports = {
   createAnalysis,
   createUser,
@@ -169,5 +175,7 @@ module.exports = {
   getResumeHistory,
   updateUserProfilePicture,
   updateUserFields,
-  updateUserByEmailFields
+  updateUserByEmailFields,
+  deleteUserLocal
 };
+
