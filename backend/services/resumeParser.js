@@ -92,11 +92,23 @@ function extractSectionsLocal(text) {
   // Extract GitHub profile details if available
   let githubUrl = null;
   let githubUsername = null;
-  const githubRegex = /(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9-]{1,39})/i;
+  const reservedWords = ["orgs", "settings", "sponsors", "features", "pricing", "about", "blog", "explore", "topics", "search", "site", "readme", "pulls", "issues"];
+
+  // 1. Standard github.com/username (allowing spaces or slashes introduced by PDF text extraction)
+  const githubRegex = /(?:https?:\/\/)?(?:www\.)?github\s*\.\s*com\s*[\/:=]\s*([a-zA-Z0-9_-]{1,39})/i;
   const githubMatch = text.match(githubRegex);
-  if (githubMatch) {
-    githubUrl = githubMatch[0];
-    githubUsername = githubMatch[1];
+
+  if (githubMatch && githubMatch[1] && !reservedWords.includes(githubMatch[1].toLowerCase())) {
+    githubUsername = githubMatch[1].trim();
+    githubUrl = `https://github.com/${githubUsername}`;
+  } else {
+    // 2. Fallback: GitHub: username, GitHub - username, or GitHub: @username
+    const githubTextRegex = /github\s*[:\-–—]?\s*@?([a-zA-Z0-9_-]{1,39})/i;
+    const textMatch = text.match(githubTextRegex);
+    if (textMatch && textMatch[1] && !reservedWords.includes(textMatch[1].toLowerCase())) {
+      githubUsername = textMatch[1].replace(/^@/, "").trim();
+      githubUrl = `https://github.com/${githubUsername}`;
+    }
   }
 
   const headerMap = {

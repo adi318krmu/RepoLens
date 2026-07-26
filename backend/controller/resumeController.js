@@ -71,6 +71,16 @@ async function analyzeResume(req, res) {
     // Step 2: Separate into sections and extract GitHub info
     const resumeSections = resumeParser.extractSectionsLocal(resumeText);
 
+    // Fallback: Check if githubUrl or githubUsername was passed explicitly in req.body
+    const customGithub = req.body.githubUsername || req.body.githubUrl;
+    if (customGithub && !resumeSections.githubUsername) {
+      const match = customGithub.match(/(?:github\.com\/)?([a-zA-Z0-9_-]{1,39})/i);
+      if (match && match[1]) {
+        resumeSections.githubUsername = match[1].trim();
+        resumeSections.githubUrl = `https://github.com/${match[1].trim()}`;
+      }
+    }
+
     // Step 3: Job roles mapping & specs retrieval
     const closestRole = await getClosestRole(targetRole, Object.keys(roles));
     const spec = roles[closestRole];
