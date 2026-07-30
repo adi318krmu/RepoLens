@@ -60,6 +60,7 @@ async function signupUser(req, res) {
         existingUser.verificationOTP = otp;
         existingUser.verificationOTPExpires = otpExpires;
         await existingUser.save();
+        console.log(`💾 [OTP SAVED] Updated OTP saved to MongoDB for ${normalizedEmail}`);
       } else {
         const { updateUserFields } = require("../services/localStore");
         await updateUserFields(existingUser._id, {
@@ -68,6 +69,7 @@ async function signupUser(req, res) {
           verificationOTP: otp,
           verificationOTPExpires: otpExpires.toISOString()
         });
+        console.log(`💾 [OTP SAVED] Updated OTP saved to LocalStore for ${normalizedEmail}`);
       }
 
       console.log(`🔑 [OTP GENERATED] Signup OTP for ${normalizedEmail}: ${otp}`);
@@ -115,6 +117,9 @@ async function signupUser(req, res) {
         verificationOTP: otp,
         verificationOTPExpires: otpExpires.toISOString()
       });
+      console.log(`💾 [OTP SAVED] New OTP saved to LocalStore for ${normalizedEmail}`);
+    } else {
+      console.log(`💾 [OTP SAVED] New OTP saved to MongoDB for ${normalizedEmail}`);
     }
 
     // Send verification email in background (non-blocking for fast UI response)
@@ -385,12 +390,14 @@ async function resendOTP(req, res) {
       user.verificationOTP = otp;
       user.verificationOTPExpires = otpExpires;
       await user.save();
+      console.log(`💾 [OTP SAVED] Resend OTP saved to MongoDB for ${normalizedEmail}`);
     } else {
       const { updateUserFields } = require("../services/localStore");
       await updateUserFields(user._id, {
         verificationOTP: otp,
         verificationOTPExpires: otpExpires.toISOString()
       });
+      console.log(`💾 [OTP SAVED] Resend OTP saved to LocalStore for ${normalizedEmail}`);
     }
 
     console.log(`🔑 [OTP GENERATED] Resend OTP for ${normalizedEmail}: ${otp}`);
@@ -453,12 +460,14 @@ async function forgotPassword(req, res) {
       user.resetOTP = otp;
       user.resetOTPExpires = otpExpires;
       await user.save();
+      console.log(`💾 [OTP SAVED] Reset OTP saved to MongoDB for ${normalizedEmail}`);
     } else {
       const { updateUserFields } = require("../services/localStore");
       await updateUserFields(user._id, {
         resetOTP: otp,
         resetOTPExpires: otpExpires.toISOString()
       });
+      console.log(`💾 [OTP SAVED] Reset OTP saved to LocalStore for ${normalizedEmail}`);
     }
 
     console.log(`🔑 [OTP GENERATED] Forgot Password OTP for ${normalizedEmail}: ${otp}`);

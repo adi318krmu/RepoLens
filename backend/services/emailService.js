@@ -2,18 +2,38 @@ const nodemailer = require("nodemailer");
 const dotenv = require("dotenv");
 dotenv.config();
 
+console.log("=== EMAIL ENVIRONMENT VARIABLES CHECK ===");
+console.log(`EMAIL_USER Status: ${process.env.EMAIL_USER ? `Loaded (${process.env.EMAIL_USER})` : "Missing"}`);
+console.log(`EMAIL_PASS Status: ${process.env.EMAIL_PASS ? "Loaded (Present)" : "Missing"}`);
+
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: parseInt(process.env.SMTP_PORT || "465", 10),
+  secure: (process.env.SMTP_SECURE || "true") === "true",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  connectionTimeout: 10000, // 10s
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
 });
 
 /**
- * Send an email with error handling
+ * Send an email with error handling and full logging
  */
 async function sendEmail({ to, subject, html, text }) {
+  console.log(`[EMAIL] Preparing transporter for ${to}`);
+
+  try {
+    console.log("[EMAIL] Verifying SMTP connection...");
+    await transporter.verify();
+    console.log("✅ SMTP connection successful");
+  } catch (verifyError) {
+    console.error("❌ SMTP connection failed:", verifyError);
+    throw verifyError;
+  }
+
   try {
     const mailOptions = {
       from: `"RepoLens Support" <${process.env.EMAIL_USER}>`,
@@ -29,11 +49,18 @@ async function sendEmail({ to, subject, html, text }) {
       mailOptions.text = html.replace(/<[^>]*>?/gm, "").replace(/\s+/g, " ").trim();
     }
 
+    console.log(`[EMAIL] Sending email to ${to}...`);
     const info = await transporter.sendMail(mailOptions);
-    console.log("Email sent successfully to %s (messageId: %s)", to, info.messageId);
+    console.log("✅ Email sent successfully");
+    console.log("[EMAIL] SendMail response:", {
+      accepted: info.accepted,
+      rejected: info.rejected,
+      response: info.response,
+      messageId: info.messageId,
+    });
     return true;
   } catch (error) {
-    console.error("Error sending email via Nodemailer to", to, ":", error);
+    console.error("❌ Error sending email via Nodemailer to", to, ":", error);
     throw error;
   }
 }
