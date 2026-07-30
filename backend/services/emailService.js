@@ -6,32 +6,60 @@ console.log("=== EMAIL ENVIRONMENT VARIABLES CHECK ===");
 console.log(`EMAIL_USER Status: ${process.env.EMAIL_USER ? `Loaded (${process.env.EMAIL_USER})` : "Missing"}`);
 console.log(`EMAIL_PASS Status: ${process.env.EMAIL_PASS ? "Loaded (Present)" : "Missing"}`);
 
-const transporter = nodemailer.createTransport({
+// Primary Transporter (Port 465 SSL, family: 4 to prevent Render IPv6 ENETUNREACH)
+const primaryTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: parseInt(process.env.SMTP_PORT || "465", 10),
   secure: (process.env.SMTP_SECURE || "true") === "true",
+  family: 4, // 🔥 Force IPv4 to prevent ENETUNREACH (errno: -101) on cloud hosters like Render
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  connectionTimeout: 10000, // 10s
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+});
+
+// Fallback Transporter (Port 587 STARTTLS, family: 4)
+const fallbackTransporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  requireTLS: true,
+  family: 4,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  connectionTimeout: 10000,
   greetingTimeout: 10000,
   socketTimeout: 10000,
 });
 
 /**
- * Send an email with error handling and full logging
+ * Send an email with error handling, IPv4 forcing, and port fallback
  */
 async function sendEmail({ to, subject, html, text }) {
   console.log(`[EMAIL] Preparing transporter for ${to}`);
 
+  let activeTransporter = primaryTransporter;
+
   try {
-    console.log("[EMAIL] Verifying SMTP connection...");
-    await transporter.verify();
-    console.log("✅ SMTP connection successful");
+    console.log("[EMAIL] Verifying primary SMTP connection (Port 465 IPv4)...");
+    await primaryTransporter.verify();
+    console.log("✅ Primary SMTP connection successful (Port 465)");
   } catch (verifyError) {
-    console.error("❌ SMTP connection failed:", verifyError);
-    throw verifyError;
+    console.warn("⚠️ Primary SMTP (Port 465) failed:", verifyError.message);
+    console.log("[EMAIL] Trying fallback SMTP connection (Port 587 IPv4 STARTTLS)...");
+    try {
+      await fallbackTransporter.verify();
+      console.log("✅ Fallback SMTP connection successful (Port 587)");
+      activeTransporter = fallbackTransporter;
+    } catch (fallbackVerifyError) {
+      console.error("❌ Both Primary and Fallback SMTP connections failed:", fallbackVerifyError);
+      throw fallbackVerifyError;
+    }
   }
 
   try {
@@ -42,7 +70,6 @@ async function sendEmail({ to, subject, html, text }) {
       html,
     };
 
-    // Provide plain text fallback to prevent emails from being marked as spam
     if (text) {
       mailOptions.text = text;
     } else if (html) {
@@ -50,7 +77,7 @@ async function sendEmail({ to, subject, html, text }) {
     }
 
     console.log(`[EMAIL] Sending email to ${to}...`);
-    const info = await transporter.sendMail(mailOptions);
+    const info = await activeTransporter.sendMail(mailOptions);
     console.log("✅ Email sent successfully");
     console.log("[EMAIL] SendMail response:", {
       accepted: info.accepted,
