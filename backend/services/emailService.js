@@ -13,21 +13,31 @@ const transporter = nodemailer.createTransport({
 /**
  * Send an email with error handling
  */
-async function sendEmail({ to, subject, html }) {
+async function sendEmail({ to, subject, html, text }) {
   try {
-    const info = await transporter.sendMail({
+    const mailOptions = {
       from: `"RepoLens Support" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
-    });
-    console.log("Email sent successfully: %s", info.messageId);
+    };
+
+    // Provide plain text fallback to prevent emails from being marked as spam
+    if (text) {
+      mailOptions.text = text;
+    } else if (html) {
+      mailOptions.text = html.replace(/<[^>]*>?/gm, "").replace(/\s+/g, " ").trim();
+    }
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully to %s (messageId: %s)", to, info.messageId);
     return true;
   } catch (error) {
-    console.error("Error sending email via Nodemailer:", error);
+    console.error("Error sending email via Nodemailer to", to, ":", error);
     throw error;
   }
 }
+
 
 /**
  * Generate Verification Email Template

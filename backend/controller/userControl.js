@@ -70,14 +70,18 @@ async function signupUser(req, res) {
         });
       }
 
-      // Send verification email in background (non-blocking for fast UI response)
-      sendEmail({
-        to: normalizedEmail,
-        subject: "Verify Your RepoLens Account",
-        html: getVerificationTemplate(name, otp)
-      }).catch(err => {
-        console.error("Failed to send signup verification email in background:", err);
-      });
+      console.log(`🔑 [OTP GENERATED] Signup OTP for ${normalizedEmail}: ${otp}`);
+
+      // Send verification email
+      try {
+        await sendEmail({
+          to: normalizedEmail,
+          subject: "Verify Your RepoLens Account",
+          html: getVerificationTemplate(name, otp)
+        });
+      } catch (err) {
+        console.error("Failed to send signup verification email:", err);
+      }
 
       return res.status(200).json({
         success: true,
@@ -88,6 +92,8 @@ async function signupUser(req, res) {
 
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    console.log(`🔑 [OTP GENERATED] Signup OTP for ${normalizedEmail}: ${otp}`);
 
     const user = getDbStatus()
       ? await User.create({
@@ -113,14 +119,16 @@ async function signupUser(req, res) {
       });
     }
 
-    // Send verification email in background (non-blocking for fast UI response)
-    sendEmail({
-      to: normalizedEmail,
-      subject: "Verify Your RepoLens Account",
-      html: getVerificationTemplate(name, otp)
-    }).catch(err => {
-      console.error("Failed to send signup verification email in background:", err);
-    });
+    // Send verification email
+    try {
+      await sendEmail({
+        to: normalizedEmail,
+        subject: "Verify Your RepoLens Account",
+        html: getVerificationTemplate(name, otp)
+      });
+    } catch (err) {
+      console.error("Failed to send signup verification email:", err);
+    }
 
     return res.status(201).json({
       success: true,
@@ -389,6 +397,8 @@ async function resendOTP(req, res) {
       });
     }
 
+    console.log(`🔑 [OTP GENERATED] Resend OTP for ${normalizedEmail}: ${otp}`);
+
     // Send verification email
     try {
       await sendEmail({
@@ -454,6 +464,8 @@ async function forgotPassword(req, res) {
         resetOTPExpires: otpExpires.toISOString()
       });
     }
+
+    console.log(`🔑 [OTP GENERATED] Forgot Password OTP for ${normalizedEmail}: ${otp}`);
 
     // Send reset email
     try {
