@@ -72,16 +72,14 @@ async function signupUser(req, res) {
 
       console.log(`🔑 [OTP GENERATED] Signup OTP for ${normalizedEmail}: ${otp}`);
 
-      // Send verification email
-      try {
-        await sendEmail({
-          to: normalizedEmail,
-          subject: "Verify Your RepoLens Account",
-          html: getVerificationTemplate(name, otp)
-        });
-      } catch (err) {
-        console.error("Failed to send signup verification email:", err);
-      }
+      // Send verification email in background (non-blocking for fast UI response)
+      sendEmail({
+        to: normalizedEmail,
+        subject: "Verify Your RepoLens Account",
+        html: getVerificationTemplate(name, otp)
+      }).catch(err => {
+        console.error("Failed to send signup verification email in background:", err);
+      });
 
       return res.status(200).json({
         success: true,
@@ -119,16 +117,14 @@ async function signupUser(req, res) {
       });
     }
 
-    // Send verification email
-    try {
-      await sendEmail({
-        to: normalizedEmail,
-        subject: "Verify Your RepoLens Account",
-        html: getVerificationTemplate(name, otp)
-      });
-    } catch (err) {
-      console.error("Failed to send signup verification email:", err);
-    }
+    // Send verification email in background (non-blocking for fast UI response)
+    sendEmail({
+      to: normalizedEmail,
+      subject: "Verify Your RepoLens Account",
+      html: getVerificationTemplate(name, otp)
+    }).catch(err => {
+      console.error("Failed to send signup verification email in background:", err);
+    });
 
     return res.status(201).json({
       success: true,
