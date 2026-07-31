@@ -288,43 +288,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="relative z-10 bg-[#0A0F1D]/50 border-t border-slate-900 py-24 px-6">
-        <div className="max-w-7xl mx-auto w-full">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl font-extrabold text-white font-display">Approved by Top Developers & Recruiters</h2>
-            <p className="mt-4 text-slate-400">What users say about optimizing their profiles with RepoLens.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                quote: "RepoLens helped me pinpoint the exact missing items in my readme. I got 3 interviewer comments complimenting my repo layout!",
-                author: "Sarah Jenkins",
-                role: "Frontend Architect",
-              },
-              {
-                quote: "The ATS resume scoring was spot-on. I added the suggested keywords and immediately started getting more call-backs for React developer roles.",
-                author: "Alex Rivera",
-                role: "Fullstack Developer Candidate",
-              },
-              {
-                quote: "Perfect for grading student repositories and evaluating incoming candidates' resumes. It saves hours of manual review.",
-                author: "Marcus Aurelius",
-                role: "Engineering Director",
-              },
-            ].map((t, idx) => (
-              <div key={idx} className="bg-[#1E293B] border border-slate-800/80 rounded-xl p-6 shadow-lg glow-card relative">
-                <p className="text-slate-300 text-sm italic leading-relaxed mb-6">"{t.quote}"</p>
-                <div>
-                  <h4 className="font-bold text-white text-sm">{t.author}</h4>
-                  <p className="text-xs text-slate-500 font-medium">{t.role}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-slate-900 bg-[#080D1A] py-12 px-6 mt-auto">
